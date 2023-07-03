@@ -1,5 +1,6 @@
 mod etc_files;
 mod services;
+mod tmp_files;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,18 @@ pub fn activate(store_path: &StorePath, ephemeral: bool) -> Result<()> {
     let state_file = &get_state_file()?;
     let old_state = State::from_file(state_file)?;
 
+    log::info!("Activating tmp files...");
+
+    match tmp_files::activate() {
+        Ok(_) => {
+            log::debug!("Successfully created tmp files");
+        }
+        Err(e) => {
+            log::error!("Error during activation of tmp files");
+            log::error!("{e}");
+        }
+    };
+
     log::info!("Activating etc files...");
 
     match etc_files::activate(store_path, old_state.file_tree, ephemeral) {
@@ -104,6 +117,7 @@ pub fn activate(store_path: &StorePath, ephemeral: bool) -> Result<()> {
         }
     }
     .write_to_file(state_file)?;
+
     Ok(())
 }
 
@@ -149,9 +163,6 @@ pub fn prepopulate(store_path: &StorePath, ephemeral: bool) -> Result<()> {
         }
     }
     .write_to_file(state_file)?;
-
-    // TODO: execute systemd-tmpfiles
-
     Ok(())
 }
 
@@ -160,6 +171,17 @@ pub fn deactivate() -> Result<()> {
     let state_file = &get_state_file()?;
     let old_state = State::from_file(state_file)?;
     log::debug!("{old_state:?}");
+
+    log::info!("Deactivating systemd-tmpfiles...");
+    match tmp_files::deactivate() {
+        Ok(_) => {
+            log::debug!("Successfully removed tmp files");
+        }
+        Err(e) => {
+            log::error!("Error during deactivation of tmp files");
+            log::error!("{e}");
+        }
+    };
 
     match etc_files::deactivate(old_state.file_tree) {
         Ok(etc_tree) => {
@@ -187,6 +209,7 @@ pub fn deactivate() -> Result<()> {
         }
     }
     .write_to_file(state_file)?;
+
     Ok(())
 }
 
